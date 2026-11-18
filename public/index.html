@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Toddler Sensory Playground</title>
+    <!-- Load Tailwind CSS for clean layout utilities -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Fredoka & Inter fonts for friendly, chunky toddler-appropriate typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Base resets to ensure zero scrolling, zero accidental text selection, and full viewport fit */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', 'Inter', sans-serif;
+            background: linear-gradient(135deg, #FFF9EC 0%, #E8F8FF 50%, #FDEEF4 100%);
+        }
+
+        /* Subtle animated pastel background shift */
+        @keyframes gentleSky {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .animated-bg {
+            background: linear-gradient(-45deg, #FFF8E7, #E6F7FF, #F3E8FF, #FFEBF0, #E8FDF5);
+            background-size: 400% 400%;
+            animation: gentleSky 24s ease infinite;
+        }
+
+        /* Full-screen interactive canvas */
+        #play-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Chunky tactile sensory buttons at the bottom */
+        .sensory-btn {
+            transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.12s ease;
+            box-shadow: 0 8px 0 rgba(0, 0, 0, 0.14), 0 12px 20px rgba(0, 0, 0, 0.1);
+            border: 4px solid rgba(255, 255, 255, 0.85);
+        }
+
+        .sensory-btn:active, .sensory-btn.pressed {
+            transform: translateY(6px) scale(0.95);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.14), 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Gentle bounce animation for the start overlay icon */
+        @keyframes floatBounce {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-14px) scale(1.06); }
+        }
+
+        .float-bounce {
+            animation: floatBounce 2.2s ease-in-out infinite;
+        }
+
+        /* Parent hold progress ring for mute button */
+        .hold-ring {
+            transition: stroke-dashoffset 0.05s linear;
+        }
+    </style>
+</head>
+<body class="animated-bg relative w-screen h-screen overflow-hidden">
+
+    <!-- Main 60fps HTML5 Canvas for shapes, animals, bubbles, sparkles, and big letters -->
+    <canvas id="play-canvas"></canvas>
+
+    <!-- Discreet Parent-Friendly Top Corner Controls (Hold 1.2s to Mute/Unmute so toddlers don't accidentally silence it) -->
+    <div id="parent-controls" class="fixed top-4 right-4 z-30 flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+        <button id="mute-hold-btn" 
+                aria-label="Hold to toggle sound"
+                class="relative w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center text-slate-600 focus:outline-none">
+            <!-- Circular progress indicator for hold action -->
+            <svg class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="#CBD5E1" stroke-width="3"></circle>
+                <circle id="hold-progress-circle" class="hold-ring" cx="24" cy="24" r="20" fill="none" stroke="#3B82F6" stroke-width="3.5" stroke-dasharray="125.6" stroke-dashoffset="125.6" stroke-linecap="round"></circle>
+            </svg>
+            <!-- Speaker Icon (Unmuted) -->
+            <svg id="icon-sound-on" class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"></path>
+            </svg>
+            <!-- Speaker Icon (Muted) -->
+            <svg id="icon-sound-off" class="w-6 h-6 text-rose-400 hidden" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                <line x1="23" y1="9" x2="17" y2="15" stroke-linecap="round"></line>
+                <line x1="17" y1="9" x2="23" y2="15" stroke-linecap="round"></line>
+            </svg>
+        </button>
+        <span id="parent-hint" class="hidden sm:inline-block text-xs font-semibold text-slate-500 bg-white/75 px-2.5 py-1 rounded-full shadow-sm pointer-events-none">
+            Hold 1s to mute
+        </span>
+    </div>
+
+    <!-- Bottom Row of Big, Chunky, Colorful Virtual Sensory Buttons for Touch & Mouse Mashing -->
+    <div id="sensory-dock" class="fixed bottom-4 left-0 right-0 z-20 px-3 sm:px-6 flex justify-center items-center gap-2 sm:gap-4 pointer-events-none">
+        <!-- Buttons are generated dynamically via JS to link directly with pentatonic notes & themes -->
+    </div>
+
+    <!-- Gentle Start Overlay to Unlock Web Audio Cleanly -->
+    <div id="start-overlay" class="fixed inset-0 z-40 flex flex-col items-center justify-center bg-white/75 backdrop-blur-md cursor-pointer transition-opacity duration-500 p-6 text-center">
+        <div class="float-bounce bg-gradient-to-br from-amber-300 via-pink-400 to-sky-400 p-2 rounded-[2.5rem] shadow-2xl mb-6">
+            <div class="bg-white rounded-[2.1rem] px-10 py-8 sm:px-14 sm:py-10 flex flex-col items-center">
+                <div class="text-6xl sm:text-8xl mb-4 select-none">🎈🦆⭐</div>
+                <h1 class="text-3xl sm:text-5xl font-bold text-slate-800 tracking-tight mb-3">
+                    Tap or Press Any Key!
+                </h1>
+                <p class="text-lg sm:text-2xl font-semibold text-sky-600">
+                    Touch anywhere to start playing
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * TODDLER SENSORY PLAYGROUND
+         * Designed specifically for 2-year-olds:
+         * - Zero dead zones: Every key, click, tap, or drag creates magic.
+         * - Harmonious C Major Pentatonic Web Audio synthesizer (never harsh or dissonant).
+         * - Smooth 60fps HTML5 Canvas particle & character physics with automatic memory cleanup.
+         */
+
+        // ==========================================
+        // 1. AUDIO ENGINE (Web Audio API Synthesizer)
+        // ==========================================
+        class GentleAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+                this.lastSparkleTime = 0;
+
+                // C Major Pentatonic frequencies across 2 octaves (C4 to E6)
+                // Any random combination of keys mashed together sounds musical and cheerful!
+                this.pentatonicNotes = [
+                    261.63, // C4
+                    293.66, // D4
+                    329.63, // E4
+                    392.00, // G4
+                    440.00, // A4
+                    523.25, // C5
+                    587.33, // D5
+                    659.25, // E5
+                    783.99, // G5
+                    880.00, // A5
+                    1046.50 // C6
+                ];
+            }
+
+            // Initialize or resume AudioContext on first user gesture
+            unlock() {
+                try {
+                    if (!this.ctx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        this.ctx = new AudioCtx();
+                    }
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                } catch (err) {
+                    console.warn('Web Audio API unavailable:', err);
+                }
+            }
+
+            // Play a soft, warm marimba/xylophone note
+            playMarimba(noteIndex = null) {
+                if (this.isMuted) return;
+                this.unlock();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    const idx = noteIndex !== null 
+                        ? noteIndex % this.pentatonicNotes.length 
+                        : Math.floor(Math.random() * this.pentatonicNotes.length);
+                    const freq = this.pentatonicNotes[idx];
+
+                    // Primary warm sine oscillator
+                    const osc = this.ctx.createOscillator();
+                    // Gentle harmonic overtone for marimba wooden warmth
+                    const overtone = this.ctx.createOscillator();
+                    const gainNode = this.ctx.createGain();
+                    const overtoneGain = this.ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    overtone.type = 'triangle';
+                    overtone.frequency.setValueAtTime(freq * 2, now);
+
+                    // Soft envelope: gentle attack, pleasant decay (no harsh clicks)
+                    gainNode.gain.setValueAtTime(0.001, now);
+                    gainNode.gain.linearRampToValueAtTime(0.22, now + 0.015);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0008, now + 0.65);
+
+                    overtoneGain.gain.setValueAtTime(0.001, now);
+                    overtoneGain.gain.linearRampToValueAtTime(0.05, now + 0.01);
+                    overtoneGain.gain.exponentialRampToValueAtTime(0.0005, now + 0.25);
+
+                    osc.connect(gainNode);
+                    overtone.connect(overtoneGain);
+                    overtoneGain.connect(gainNode);
+                    gainNode.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    overtone.start(now);
+                    osc.stop(now + 0.7);
+                    overtone.stop(now + 0.3);
+                } catch (e) {
+                    // Fail silently so gameplay never interrupts
+                }
+            }
+
+            // Play a cute cheerful bubble pop / boing sound
+            playBubblePop() {
+                if (this.isMuted) return;
+                this.unlock();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    const startFreq = 280 + Math.random() * 220;
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(startFreq, now);
+                    osc.frequency.exponentialRampToValueAtTime(startFreq * 2.1, now + 0.14);
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.18, now + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.18);
+                } catch (e) {}
+            }
+
+            // Play a gentle twinkling chime when dragging finger/mouse
+            playSparkleChime() {
+                if (this.isMuted) return;
+                this.unlock();
+                if (!this.ctx) return;
+
+                const nowMs = performance.now();
+                // Throttle drag sounds so they sound like a fairy wand rather than noise
+                if (nowMs - this.lastSparkleTime < 85) return;
+                this.lastSparkleTime = nowMs;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    const highNotes = [523.25, 659.25, 783.99, 880.00, 1046.50, 1174.66];
+                    const freq = highNotes[Math.floor(Math.random() * highNotes.length)];
+
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.09, now + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.32);
+                } catch (e) {}
+            }
+        }
+
+        const audio = new GentleAudioEngine();
+
+        // ==========================================
+        // 2. VISUAL ASSETS & COLOR PALETTE
+        // ==========================================
+        const BRIGHT_COLORS = [
+            '#FF595E', // Vibrant Coral Red
+            '#FF924C', // Cheerful Tangerine
+            '#FFCA3A', // Sunny Yellow
+            '#8AC926', // Fresh Apple Green
+            '#1982C4', // Bright Sky Blue
+            '#6A4C93', // Playful Grape Purple
+            '#FF70A6', // Bubblegum Pink
+            '#00BBF9'  // Electric Cyan
+        ];
+
+        const TODDLER_EMOJIS = [
+            '🦆', '🐶', '🐱', '🐰', '🐻', '🦁', '🐸', '🐵',
+            '🦄', '🐢', '🐠', '🦋', '🐞', '🐝', '🎈', '🚀',
+            '🌈', '⭐', '☀️', '🍎', '🍓', '🍌', '🍉', '🚗',
+            '🚂', '✈️', '⚽', '🎵', '💖', '🌸', '🍦', '🦖'
+        ];
+
+        const DOCK_BUTTONS = [
+            { emoji: '🦆', color: '#FF595E', note: 0, label: 'Duck' },
+            { emoji: '⭐', color: '#FFCA3A', note: 2, label: 'Star' },
+            { emoji: '🎈', color: '#8AC926', note: 4, label: 'Balloon' },
+            { emoji: '🚀', color: '#1982C4', note: 5, label: 'Rocket' },
+            { emoji: '🌈', color: '#6A4C93', note: 7, label: 'Rainbow' },
+            { emoji: '🐶', color: '#FF70A6', note: 9, label: 'Puppy' }
+        ];
+
+        // ==========================================
+        // 3. CANVAS & PARTICLE SYSTEM
+        // ==========================================
+        const canvas = document.getElementById('play-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Active visual entities
+        const ripples = [];
+        const particles = [];
+        const heroes = []; // Large central/pop-up emojis, shapes, or pressed letters
+        const MAX_PARTICLES = 180;
+        const MAX_HEROES = 18;
+
+        // Ambient floating background clouds/bubbles so the screen always feels alive
+        const ambientBubbles = Array.from({ length: 12 }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            r: 25 + Math.random() * 45,
+            speedY: 0.25 + Math.random() * 0.45,
+            wobbleOffset: Math.random() * Math.PI * 2,
+            color: BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)]
+        }));
+
+        // Helper: Draw a 5-point star on canvas
+        function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius, color, rotation = 0) {
+            let rot = (Math.PI / 2) * 3 + rotation;
+            let x = cx;
+            let y = cy;
+            const step = Math.PI / spikes;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - outerRadius);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                ctx.lineTo(x, y);
+                rot += step;
+            }
+            ctx.lineTo(cx, cy - outerRadius);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Helper: Draw a cute heart on canvas
+        function drawHeart(ctx, cx, cy, size, color, rotation = 0) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(rotation);
+            ctx.beginPath();
+            const topCurveHeight = size * 0.3;
+            ctx.moveTo(0, topCurveHeight);
+            ctx.bezierCurveTo(0, 0, -size / 2, 0, -size / 2, topCurveHeight);
+            ctx.bezierCurveTo(-size / 2, (size + topCurveHeight) / 2, 0, (size + topCurveHeight) / 1.4, 0, size);
+            ctx.bezierCurveTo(0, (size + topCurveHeight) / 1.4, size / 2, (size + topCurveHeight) / 2, size / 2, topCurveHeight);
+            ctx.bezierCurveTo(size / 2, 0, 0, 0, 0, topCurveHeight);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Spawn expanding colorful ripple ring
+        function spawnRipple(x, y, color) {
+            ripples.push({
+                x,
+                y,
+                radius: 15,
+                maxRadius: Math.min(width, height) * 0.32,
+                color,
+                alpha: 0.85,
+                lineWidth: 10
+            });
+        }
+
+        // Spawn burst of colorful confetti, stars, and bubbles
+        function spawnBurst(x, y, baseColor, count = 16) {
+            const shapes = ['circle', 'star', 'heart', 'bubble'];
+            for (let i = 0; i < count; i++) {
+                if (particles.length >= MAX_PARTICLES) {
+                    particles.shift();
+                }
+                const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+                const speed = 3 + Math.random() * 8;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    gravity: 0.16,
+                    size: 10 + Math.random() * 14,
+                    color: Math.random() > 0.35 ? BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)] : baseColor,
+                    shape: shapes[Math.floor(Math.random() * shapes.length)],
+                    rotation: Math.random() * Math.PI * 2,
+                    vRot: (Math.random() - 0.5) * 0.18,
+                    alpha: 1,
+                    decay: 0.012 + Math.random() * 0.01
+                });
+            }
+        }
+
+        // Spawn a big, joyful hero item (Cute Animal/Toy Emoji, Giant Shape, or Friendly Letter/Number)
+        function spawnHero(x, y, options = {}) {
+            if (heroes.length >= MAX_HEROES) {
+                heroes.shift();
+            }
+
+            const color = options.color || BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)];
+            const emoji = options.emoji || TODDLER_EMOJIS[Math.floor(Math.random() * TODDLER_EMOJIS.length)];
+            const label = options.label || null; // e.g. 'A', 'B', '1', '2'
+
+            // Decide behavior: float up like a balloon or bounce playfully in place
+            const isBalloonFloat = Math.random() > 0.45;
+
+            heroes.push({
+                x,
+                y,
+                vx: (Math.random() - 0.5) * 2.5,
+                vy: isBalloonFloat ? -(1.8 + Math.random() * 2.2) : -(3.5 + Math.random() * 2.5),
+                gravity: isBalloonFloat ? -0.015 : 0.14,
+                emoji,
+                label,
+                color,
+                scale: 0.1,
+                targetScale: 1,
+                wobblePhase: Math.random() * Math.PI * 2,
+                life: 1.0,
+                decay: 0.0075
+            });
+        }
+
+        // Spawn gentle trail sparkles when dragging a finger or mouse
+        function spawnTrailSparkle(x, y) {
+            if (particles.length >= MAX_PARTICLES) {
+                particles.shift();
+            }
+            const color = BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)];
+            particles.push({
+                x: x + (Math.random() - 0.5) * 20,
+                y: y + (Math.random() - 0.5) * 20,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -0.8 - Math.random() * 1.8,
+                gravity: 0.02,
+                size: 11 + Math.random() * 12,
+                color,
+                shape: Math.random() > 0.4 ? 'star' : 'bubble',
+                rotation: Math.random() * Math.PI * 2,
+                vRot: (Math.random() - 0.5) * 0.15,
+                alpha: 1,
+                decay: 0.022
+            });
+        }
+
+        // Master trigger function for any press, tap, or keystroke
+        function triggerJoyfulEvent(x, y, options = {}) {
+            const color = options.color || BRIGHT_COLORS[Math.floor(Math.random() * BRIGHT_COLORS.length)];
+            
+            // 1. Play pleasant sound
+            if (options.soundType === 'pop') {
+                audio.playBubblePop();
+            } else {
+                audio.playMarimba(options.noteIndex !== undefined ? options.noteIndex : null);
+            }
+
+            // 2. Spawn ripple + burst + big hero character
+            spawnRipple(x, y, color);
+            spawnBurst(x, y, color, 14);
+            spawnHero(x, y, {
+                color,
+                emoji: options.emoji,
+                label: options.label
+            });
+        }
+
+        // ==========================================
+        // 4. MAIN 60FPS ANIMATION LOOP
+        // ==========================================
+        let frameCount = 0;
+
+        function animate() {
+            frameCount++;
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw soft ambient floating bubbles in background
+            for (let i = 0; i < ambientBubbles.length; i++) {
+                const b = ambientBubbles[i];
+                b.y -= b.speedY;
+                const swayX = Math.sin(frameCount * 0.015 + b.wobbleOffset) * 18;
+                if (b.y + b.r < -20) {
+                    b.y = height + b.r + 20;
+                    b.x = Math.random() * width;
+                }
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(b.x + swayX, b.y, b.r, 0, Math.PI * 2);
+                ctx.fillStyle = b.color + '18'; // Very subtle pastel tint
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = b.color + '30';
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 2. Update & draw expanding ripples
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                const r = ripples[i];
+                r.radius += (r.maxRadius - r.radius) * 0.08 + 2.5;
+                r.alpha -= 0.022;
+                r.lineWidth *= 0.96;
+
+                if (r.alpha <= 0.02) {
+                    ripples.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = r.color;
+                ctx.globalAlpha = Math.max(0, r.alpha);
+                ctx.lineWidth = Math.max(1, r.lineWidth);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 3. Update & draw burst particles & trail sparkles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.rotation += p.vRot;
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0.02) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+
+                if (p.shape === 'star') {
+                    drawStar(ctx, p.x, p.y, 5, p.size, p.size * 0.48, p.color, p.rotation);
+                } else if (p.shape === 'heart') {
+                    drawHeart(ctx, p.x, p.y - p.size * 0.5, p.size * 1.4, p.color, p.rotation);
+                } else if (p.shape === 'bubble') {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 0.85, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color + '55';
+                    ctx.fill();
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.stroke();
+                    // Tiny shine highlight
+                    ctx.beginPath();
+                    ctx.arc(p.x - p.size * 0.28, p.y - p.size * 0.28, p.size * 0.2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 0.75, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.fill();
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // 4. Update & draw big joyful hero items (animals, balloons, letters/numbers)
+            for (let i = heroes.length - 1; i >= 0; i--) {
+                const h = heroes[i];
+                // Elastic pop-in spring
+                h.scale += (h.targetScale - h.scale) * 0.22;
+                h.wobblePhase += 0.1;
+
+                h.x += h.vx + Math.sin(h.wobblePhase) * 0.9;
+                h.y += h.vy;
+                h.vy += h.gravity;
+
+                // Soft bounce off floor if falling
+                const floorLimit = height - 110;
+                if (h.y > floorLimit && h.vy > 0) {
+                    h.y = floorLimit;
+                    h.vy *= -0.55;
+                }
+
+                h.life -= h.decay;
+                if (h.life <= 0.02) {
+                    heroes.splice(i, 1);
+                    continue;
+                }
+
+                const alpha = h.life < 0.25 ? h.life / 0.25 : 1;
+                const wobbleAngle = Math.sin(h.wobblePhase) * 0.12;
+                const baseSize = Math.min(width, height) * 0.14;
+                const clampedSize = Math.max(76, Math.min(135, baseSize));
+
+                ctx.save();
+                ctx.translate(h.x, h.y);
+                ctx.rotate(wobbleAngle);
+                ctx.scale(h.scale, h.scale);
+                ctx.globalAlpha = Math.max(0, alpha);
+
+                // Draw cheerful sticker badge behind the emoji/letter
+                ctx.beginPath();
+                ctx.arc(0, 0, clampedSize * 0.62, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
+                ctx.shadowBlur = 16;
+                ctx.shadowOffsetY = 6;
+                ctx.fill();
+
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = h.color;
+                ctx.stroke();
+                ctx.shadowColor = 'transparent';
+
+                if (h.label) {
+                    // Display big, friendly letter or number alongside a cute mini emoji
+                    ctx.font = `700 ${Math.round(clampedSize * 0.68)}px "Fredoka", sans-serif`;
+                    ctx.fillStyle = h.color;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(h.label, 0, 4);
+
+                    // Cute companion emoji perched on the top-right edge of the badge
+                    ctx.font = `${Math.round(clampedSize * 0.38)}px sans-serif`;
+                    ctx.fillText(h.emoji, clampedSize * 0.45, -clampedSize * 0.45);
+                } else {
+                    // Display big joyful animal/toy emoji
+                    ctx.font = `${Math.round(clampedSize * 0.72)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(h.emoji, 0, 4);
+                }
+
+                ctx.restore();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation loop on window load
+        window.onload = function () {
+            animate();
+        };
+
+        // ==========================================
+        // 5. INPUT HANDLING (Keyboard, Touch, Mouse)
+        // ==========================================
+        const startOverlay = document.getElementById('start-overlay');
+        let hasStarted = false;
+
+        function dismissStartOverlay() {
+            if (hasStarted) return;
+            hasStarted = true;
+            audio.unlock();
+            startOverlay.style.opacity = '0';
+            setTimeout(() => {
+                startOverlay.style.display = 'none';
+            }, 500);
+        }
+
+        // Build the bottom chunky sensory buttons
+        const sensoryDock = document.getElementById('sensory-dock');
+        DOCK_BUTTONS.forEach((btnConfig) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.ariaLabel = btnConfig.label;
+            btn.className = 'sensory-btn pointer-events-auto flex-1 max-w-[115px] h-16 sm:h-20 rounded-3xl flex items-center justify-center text-3xl sm:text-5xl focus:outline-none';
+            btn.style.backgroundColor = btnConfig.color;
+            btn.textContent = btnConfig.emoji;
+
+            const handleDockPress = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dismissStartOverlay();
+
+                btn.classList.add('pressed');
+                setTimeout(() => btn.classList.remove('pressed'), 140);
+
+                const rect = btn.getBoundingClientRect();
+                const spawnX = rect.left + rect.width / 2;
+                const spawnY = rect.top - 40;
+
+                triggerJoyfulEvent(spawnX, spawnY, {
+                    color: btnConfig.color,
+                    emoji: btnConfig.emoji,
+                    noteIndex: btnConfig.note
+                });
+            };
+
+            btn.addEventListener('pointerdown', handleDockPress);
+            sensoryDock.appendChild(btn);
+        });
+
+        // Handle Pointer (Touch & Mouse) interactions on the main canvas
+        let isPointerDown = false;
+
+        canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            dismissStartOverlay();
+            isPointerDown = true;
+
+            triggerJoyfulEvent(e.clientX, e.clientY, {
+                soundType: Math.random() > 0.75 ? 'pop' : 'marimba'
+            });
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isPointerDown && e.pointerType === 'touch') return;
+            // Leaving a sparkle trail whenever dragging (or moving mouse while pressed)
+            if (isPointerDown) {
+                spawnTrailSparkle(e.clientX, e.clientY);
+                audio.playSparkleChime();
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+
+        window.addEventListener('pointercancel', () => {
+            isPointerDown = false;
+        });
+
+        // Start overlay click/tap handler
+        startOverlay.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            dismissStartOverlay();
+            triggerJoyfulEvent(width / 2, height / 2, { emoji: '🎉' });
+        });
+
+        // Handle ANY Keyboard Key press (letters, numbers, spacebar, arrows, etc.)
+        const activeKeys = new Set();
+
+        window.addEventListener('keydown', (e) => {
+            // Prevent browser scrolling or tabbing away on common toddler-mashed keys
+            const keysToPrevent = [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Backspace'];
+            if (keysToPrevent.includes(e.key) || (!e.ctrlKey && !e.metaKey && !e.altKey)) {
+                e.preventDefault();
+            }
+
+            dismissStartOverlay();
+
+            // Ignore auto-repeat while a toddler sits on a key so audio/CPU stays clean
+            if (activeKeys.has(e.code)) return;
+            activeKeys.add(e.code);
+
+            // Spawn within a safe, comfortable visual area above the bottom dock
+            const marginX = Math.max(80, width * 0.14);
+            const marginY = Math.max(90, height * 0.16);
+            const randX = marginX + Math.random() * (width - marginX * 2);
+            const randY = marginY + Math.random() * (height - marginY * 2 - 60);
+
+            // Check if the pressed key is a friendly single letter or number
+            const isAlphaNum = /^[a-zA-Z0-9]$/.test(e.key);
+            const displayLabel = isAlphaNum ? e.key.toUpperCase() : null;
+
+            // Map key code to a consistent pentatonic note
+            const keyHash = e.code.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+            triggerJoyfulEvent(randX, randY, {
+                label: displayLabel,
+                noteIndex: keyHash % audio.pentatonicNotes.length
+            });
+        });
+
+        window.addEventListener('keyup', (e) => {
+            activeKeys.delete(e.code);
+        });
+
+        // ==========================================
+        // 6. PARENT HOLD-TO-MUTE CONTROL
+        // ==========================================
+        const muteHoldBtn = document.getElementById('mute-hold-btn');
+        const holdCircle = document.getElementById('hold-progress-circle');
+        const iconSoundOn = document.getElementById('icon-sound-on');
+        const iconSoundOff = document.getElementById('icon-sound-off');
+
+        const CIRCUMFERENCE = 125.6;
+        const HOLD_DURATION = 1100; // 1.1 seconds hold prevents accidental toddler taps
+        let holdStartTime = null;
+        let holdAnimFrame = null;
+
+        function updateHoldProgress() {
+            if (!holdStartTime) return;
+            const elapsed = performance.now() - holdStartTime;
+            const progress = Math.min(elapsed / HOLD_DURATION, 1);
+            holdCircle.style.strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+
+            if (progress >= 1) {
+                // Toggle mute state
+                audio.isMuted = !audio.isMuted;
+                iconSoundOn.classList.toggle('hidden', audio.isMuted);
+                iconSoundOff.classList.toggle('hidden', !audio.isMuted);
+                if (!audio.isMuted) {
+                    audio.playMarimba(5);
+                }
+                cancelHold();
+            } else {
+                holdAnimFrame = requestAnimationFrame(updateHoldProgress);
+            }
+        }
+
+        function startHold(e) {
+            e.stopPropagation();
+            holdStartTime = performance.now();
+            holdAnimFrame = requestAnimationFrame(updateHoldProgress);
+        }
+
+        function cancelHold() {
+            holdStartTime = null;
+            if (holdAnimFrame) {
+                cancelAnimationFrame(holdAnimFrame);
+                holdAnimFrame = null;
+            }
+            holdCircle.style.strokeDashoffset = CIRCUMFERENCE;
+        }
+
+        muteHoldBtn.addEventListener('pointerdown', startHold);
+        muteHoldBtn.addEventListener('pointerup', cancelHold);
+        muteHoldBtn.addEventListener('pointerleave', cancelHold);
+        muteHoldBtn.addEventListener('pointercancel', cancelHold);
+    </script>
+</body>
+</html>
